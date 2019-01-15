@@ -13,11 +13,12 @@ function fetchResult() {
     uri: uri,
     headers: {
       'Authorization': decrypted
-    }
+    },
+    json: true
   };
   return http(options).then((body) => {
     return { // the initial response
-      text: body,
+      text: body.groups.map(group => group.name).join(', '),
       response_type: 'in_channel'
     }
   }).catch((err) => {
