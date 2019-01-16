@@ -41,27 +41,39 @@ function decrypt() {
 }
 
 const bot = botBuilder(function (message, apiRequest) {
-  return new Promise((resolve, reject) => {
-    lambda.invoke({
-      FunctionName: apiRequest.lambdaContext.functionName,
-      InvocationType: 'Event',
-      Payload: JSON.stringify({
-        slackEvent: message // this will enable us to detect the event later and filter it
-      }),
-      Qualifier: apiRequest.lambdaContext.functionVersion
-    }, (err, done) => {
-      if (err) return reject(err);
+  if (message.text == 'group list') {
+    return new Promise((resolve, reject) => {
+      lambda.invoke({
+        FunctionName: apiRequest.lambdaContext.functionName,
+        InvocationType: 'Event',
+        Payload: JSON.stringify({
+          slackEvent: message // this will enable us to detect the event later and filter it
+        }),
+        Qualifier: apiRequest.lambdaContext.functionVersion
+      }, (err, done) => {
+        if (err) return reject(err);
 
-      resolve();
+        resolve();
+      });
+    }).then(() => {
+      return { // the initial response
+        text: 'Working on it...',
+        response_type: 'ephemeral'
+      }
+    // }).catch(() => {
+    //   return `Could not setup the timer`
     });
-  }).then(() => {
-    return { // the initial response
-      text: 'Working on it...',
-      response_type: 'in_channel'
+  } else if (message.text == 'help') {
+    return {
+      text: `Try one of 'group list'`,
+      response_type: 'ephemeral'
     }
-  // }).catch(() => {
-  //   return `Could not setup the timer`
-  });
+  } else {
+    return {
+      text: `Mud q?`,
+      response_type: 'ephemeral'
+    }
+  }
 
   // return 'Thanks for sending ' + request.text  + 
   //   '. Your message is very important to us, but ' + 
@@ -86,7 +98,8 @@ bot.intercept((event) => {
       console.log('Done making request');
       return slackDelayedReply(message, {
         text: body.groups.map(group => group.name).join(', '),
-        response_type: 'in_channel'
+        response_type: 'ephemeral',
+        replace_original: true
       });
     }).catch((err) => {
       return {
