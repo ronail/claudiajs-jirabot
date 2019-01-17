@@ -9,16 +9,18 @@ const lambda = new AWS.Lambda();
 const encrypted = process.env['JIRA_AUTH_HEADER'];
 let decrypted;
 
-const uri = "https://shopline.atlassian.net/rest/api/3/groups/picker";
-function fetchResult() {
+function fetchResult(message) {
+  var apiPath = getApiPath(message.text);
+  var uri = `https://shopline.atlassian.net/rest/api/3/${apiPath}`;
   var options = {
     uri: uri,
     headers: {
       'Authorization': decrypted
     },
+    qs: getQueryString(message.text),
     json: true
   };
-  console.log('Ready to make request');
+  console.log(`Ready to make request ${uri}`);
   return http(options)
 };
 
@@ -34,14 +36,40 @@ function decrypt() {
           reject(err);
       }
       decrypted = data.Plaintext.toString('ascii');
-      resolve(decrypted);
       console.log('Done decrypt');
+      resolve(decrypted);
     });
   });
 }
 
+function getApiPath(text) {
+  if (text == 'group list') {
+    return 'groups/picker';
+  } else if (text.startsWith('user show ')) {
+    return 'user';
+  }
+}
+
+function getQueryString(text) {
+  if (text.startsWith('user show ')) {
+    return {
+      username: text.substr('user show '.length),
+      expand: 'groups'
+    };
+  }
+  return {}
+}
+
+function getResponseText(text, body) {
+  if (text == 'group list') {
+    return body.groups.map(group => group.name).join(', ');
+  } else if (text.startsWith('user show ')) {
+    return `${body.displayName} (${body.emailAddress}) [${body.groups.items.map(group => group.name).join(', ')}]`;
+  }
+}
+
 const bot = botBuilder(function (message, apiRequest) {
-  if (message.text == 'group list') {
+  if (message.text == 'group list' || message.text.startsWith('user show')) {
     return new Promise((resolve, reject) => {
       lambda.invoke({
         FunctionName: apiRequest.lambdaContext.functionName,
@@ -93,15 +121,16 @@ bot.intercept(async (event) => {
   if (!decrypted) {
     await decrypt();
   }
-  return await fetchResult()
+  return await fetchResult(message)
     .then((body) => {
       console.log('Done making request');
       return slackDelayedReply(message, {
-        text: body.groups.map(group => group.name).join(', '),
+        text: getResponseText(message.text, body),
         response_type: 'ephemeral',
         replace_original: true
       });
     }).catch((err) => {
+      console.error(err);
       return {
         text: err
       }
