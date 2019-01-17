@@ -9,9 +9,11 @@ const lambda = new AWS.Lambda();
 const encrypted = process.env['JIRA_AUTH_HEADER'];
 let decrypted;
 
+const JIRA_PROJECT = process.env['JIRA_PROJECT'];
+
 function fetchResult(message) {
   var apiPath = getApiPath(message.text);
-  var uri = `https://shopline.atlassian.net/rest/api/3/${apiPath}`;
+  var uri = `https://${JIRA_PROJECT}.atlassian.net/rest/api/3/${apiPath}`;
   var options = {
     uri: uri,
     headers: {
