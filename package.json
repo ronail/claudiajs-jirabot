@@ -4,10 +4,11 @@
   "description": "",
   "main": "bot.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "create": "claudia create --api-module bot --region ap-southeast-1 --timeout 120 --allow-recursion --configure-slack-slash-command",
+    "update": "claudia update"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Ronald Li <ronald@shoplineapp.com>",
+  "license": "GPL",
   "dependencies": {
     "claudia": "^5.3.0",
     "claudia-api-builder": "^4.1.1",
