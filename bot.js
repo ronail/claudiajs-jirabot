@@ -84,16 +84,16 @@ const bot = botBuilder(function (message, apiRequest) {
 // we detect if the event has a flag set by line 21,
 // and if so, avoid normal procesing, running a delayed response instead
 
-bot.intercept((event) => {
+bot.intercept(async (event) => {
   if (!event.slackEvent) // if this is a normal web request, let it run
     return event;
 
   const message = event.slackEvent;
 
   if (!decrypted) {
-    decrypt();
+    await decrypt();
   }
-  return fetchResult()
+  return await fetchResult()
     .then((body) => {
       console.log('Done making request');
       return slackDelayedReply(message, {
