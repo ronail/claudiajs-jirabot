@@ -98,6 +98,33 @@ const COMMANDS = [
     getResponseText: function(body) {
       return `User ${body.name} (${body.displayName}) is created successfully`;
     }
+  },
+  {
+    match: function(text) {
+      return text.startsWith('group add ');
+    },
+    getApiPath: function() {
+      return 'group/user';
+    },
+    getQueryStrings: function() {
+      var json = this.text.substr('group add '.length).split(",").map(str => str.split('=')).reduce((acc, cur) => { acc[cur[0]] = cur[1]; return acc }, {})
+      return {
+        groupname: json.group 
+      }
+    },
+    getBody: function() {
+      // name=Foo,email=foo@bar.com
+      var json = this.text.substr('group add '.length).split(",").map(str => str.split('=')).reduce((acc, cur) => { acc[cur[0]] = cur[1]; return acc }, {})
+      return {
+        name: json.user
+      }
+    },
+    getHTTPMethod: function() {
+       return 'POST';
+    },
+    getResponseText: function(body) {
+      return `Group ${body.name} contains ${body.users.size} Users now`;
+    }
   }
 ];
 
