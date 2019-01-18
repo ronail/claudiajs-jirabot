@@ -15,13 +15,16 @@ function fetchResult(command) {
   var apiPath = command.getApiPath();
   var uri = `https://${JIRA_PROJECT}.atlassian.net/rest/api/3/${apiPath}`;
   var options = {
+    method: typeof command.getHTTPMethod !== 'undefined' ? command.getHTTPMethod() : 'GET',
     uri: uri,
     headers: {
       'Authorization': decrypted
     },
     qs: typeof command.getQueryStrings !== 'undefined' ? command.getQueryStrings() : {},
+    body: typeof command.getBody !== 'undefined' ? command.getBody() : undefined,
     json: true
   };
+  console.log(options);
   console.log(`Ready to make request ${uri}`);
   return http(options)
 };
@@ -71,6 +74,29 @@ const COMMANDS = [
     },
     getResponseText: function(body) {
       return `${body.displayName} (${body.emailAddress}) [${body.groups.items.map(group => group.name).join(', ')}]`;
+    }
+  },
+  {
+    match: function(text) {
+      return text.startsWith('user create ');
+    },
+    getApiPath: function() {
+      return 'user';
+    },
+    getBody: function() {
+      // name=Foo,email=foo@bar.com
+      var json = this.text.substr('user create '.length).split(",").map(str => str.split('=')).reduce((acc, cur) => { acc[cur[0]] = cur[1]; return acc }, {})
+      return {
+        emailAddress: json.email,
+        displayName: json.name,
+        notification: true
+      }
+    },
+    getHTTPMethod: function() {
+       return 'POST';
+    },
+    getResponseText: function(body) {
+      return `User ${body.name} (${body.displayName}) is created successfully`;
     }
   }
 ];
@@ -140,14 +166,16 @@ bot.intercept(async (event) => {
       console.log('Done making request');
       return slackDelayedReply(message, {
         text: command.getResponseText(body),
-        response_type: 'ephemeral',
+        response_type: 'in_channel',
         replace_original: true
       });
     }).catch((err) => {
       console.error(err);
-      return {
-        text: err
-      }
+      return slackDelayedReply(message, {
+        text: err.response.body.errorMessages.join(),
+        response_type: 'ephemeral',
+        replace_original: true
+      });
     })
     .then(() => false); // prevent normal execution
 });
