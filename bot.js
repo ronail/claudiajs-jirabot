@@ -11,15 +11,15 @@ let decrypted;
 
 const JIRA_PROJECT = process.env['JIRA_PROJECT'];
 
-function fetchResult(message) {
-  var apiPath = getApiPath(message.text);
+function fetchResult(command) {
+  var apiPath = command.getApiPath();
   var uri = `https://${JIRA_PROJECT}.atlassian.net/rest/api/3/${apiPath}`;
   var options = {
     uri: uri,
     headers: {
       'Authorization': decrypted
     },
-    qs: getQueryString(message.text),
+    qs: typeof command.getQueryStrings !== 'undefined' ? command.getQueryStrings() : {},
     json: true
   };
   console.log(`Ready to make request ${uri}`);
@@ -44,34 +44,45 @@ function decrypt() {
   });
 }
 
-function getApiPath(text) {
-  if (text == 'group list') {
-    return 'groups/picker';
-  } else if (text.startsWith('user show ')) {
-    return 'user';
+const COMMANDS = [
+  {
+    match: function(text) {
+      return text == 'group list';
+    },
+    getApiPath: function() {
+      return 'groups/picker';
+    },
+    getResponseText: function(body) {
+      return body.groups.map(group => group.name).join(', ');
+    } 
+  },
+  {
+    match: function(text) {
+      return text.startsWith('user show ');
+    },
+    getApiPath: function() {
+      return 'user';
+    },
+    getQueryStrings: function() {
+      return {
+        username: this.text.substr('user show '.length),
+        expand: 'groups'
+      }
+    },
+    getResponseText: function(body) {
+      return `${body.displayName} (${body.emailAddress}) [${body.groups.items.map(group => group.name).join(', ')}]`;
+    }
   }
-}
+];
 
-function getQueryString(text) {
-  if (text.startsWith('user show ')) {
-    return {
-      username: text.substr('user show '.length),
-      expand: 'groups'
-    };
-  }
-  return {}
-}
-
-function getResponseText(text, body) {
-  if (text == 'group list') {
-    return body.groups.map(group => group.name).join(', ');
-  } else if (text.startsWith('user show ')) {
-    return `${body.displayName} (${body.emailAddress}) [${body.groups.items.map(group => group.name).join(', ')}]`;
-  }
+function getCommand(text) {
+  var command = COMMANDS.find(command => { return command.match(text); });
+  command.text = text;
+  return command;
 }
 
 const bot = botBuilder(function (message, apiRequest) {
-  if (message.text == 'group list' || message.text.startsWith('user show')) {
+  if (getCommand(message.text)) {
     return new Promise((resolve, reject) => {
       lambda.invoke({
         FunctionName: apiRequest.lambdaContext.functionName,
@@ -123,11 +134,12 @@ bot.intercept(async (event) => {
   if (!decrypted) {
     await decrypt();
   }
-  return await fetchResult(message)
+  var command = getCommand(message.text);
+  return await fetchResult(command)
     .then((body) => {
       console.log('Done making request');
       return slackDelayedReply(message, {
-        text: getResponseText(message.text, body),
+        text: command.getResponseText(body),
         response_type: 'ephemeral',
         replace_original: true
       });
